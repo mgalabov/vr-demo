@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+  <meta charset="UTF-8">
+  <title>Сензор с камера + VR</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+    body { margin: 0; overflow: hidden; }
+    #cameraFeed {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: -1; /* ЗАД рендъра */
+    }
+    #lcdText {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      color: lime;
+      background: black;
+      font-family: monospace;
+      padding: 10px;
+      font-size: 20px;
+      z-index: 2;
+    }
+    #voiceStatus {
+      position:absolute;
+      top:20px;
+      right:20px;
+      padding:10px;
+      background:black;
+      color:white;
+      font-size:16px;
+      z-index:2;
+    }
+    #controls {
+      position: absolute;
+      top: 80px;
+      left: 20px;
+      z-index: 2;
+    }
+    button {
+      font-size: 18px;
+      margin: 5px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Камера фон (на компютър ще работи; в очилата най-вероятно ще се игнорира) -->
+  <video id="cameraFeed" autoplay playsinline muted></video>
+
+  <div id="lcdText">Разстояние: -- см</div>
+  <div id="voiceStatus">🎙️ Гласово разпознаване: изключено</div>
+
+  <div id="controls">
+    <button onclick="startSensor()">ВКЛ.</button>
+    <button onclick="stopSensor()">ИЗКЛ.</button>
+    <button onclick="toggleVoice()">🎙️ Гласов контрол</button>
+  </div>
+
+  <!-- ЦЕЛИЯТ СКРИПТ ВЕЧЕ Е МОДУЛ С WebXR (VRButton) -->
+  <script type="module">
+    import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
+    import { VRButton } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/webxr/VRButton.js";
+
+    // === Камера като фон (може да не тръгне в очила, но не пречи) ===
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      navigator.mediaDevices.getUserMedia({ video: true }).then(function(stream) {
+        const video = document.getElementById("cameraFeed");
+        if (video) video.srcObject = stream;
+      }).catch(function(error) {
+        console.error("Камерата не можа да бъде включена:", error);
+      });
+    }
+
+    // === THREE.js сцена ===
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(
+      75,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      1000
+    );
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.domElement.style.position = "absolute";
+    renderer.domElement.style.top = "0";
+    renderer.domElement.style.left = "0";
+    renderer.domElement.style.zIndex = "0";
+    renderer.setClearColor(0x000000, 0); // прозрачен фон над видеото
+    document.body.appendChild(renderer.domElement);
+
+    // 🔹 Включваме WebXR и добавяме VR бутон
+    renderer.xr.enabled = true;
+    document.body.appendChild(VRButton.createButton(renderer));
+
+    const light = new THREE.AmbientLight(0xffffff, 1);
+    scene.add(light);
+
+    const sensor = new THREE.Mesh(
+      new THREE.BoxGeometry(1, 0.5, 0.5),
+      new THREE.MeshStandardMaterial({ color: 0x00ffcc })
+    );
+    sensor.position.set(0, 0, 0);
+    scene.add(sensor);
+
+    const target = new THREE.Mesh(
+      new THREE.SphereGeometry(0.3, 16, 16),
+      new THREE.MeshStandardMaterial({ color: 0xff0000 })
+    );
+    target.position.set(0, 0, 2);
+    scene.add(target);
+
+    const ledMaterial = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
+    const led = new THREE.Mesh(
+      new THREE.SphereGeometry(0.2, 16, 16),
+      ledMaterial
+    );
+    led.position.set(1.5, 0, 0);
+    scene.add(led);
+
+    camera.position.set(0, 0, 5);
+
+    const lcdTextEl   = document.getElementById('lcdText');
+    const voiceStatus = document.getElementById('voiceStatus');
+
+    // === Говорене (Text-to-Speech) ===
+    const synth = window.speechSynthesis;
+    let lastSpokenMessage = "";
+
+    function speakMessage(message) {
+      if (!synth) return;
+      if (lastSpokenMessage === message) return;
+      const utterance = new SpeechSynthesisUtterance(message);
+      utterance.lang = 'bg-BG';
+      synth.cancel();
+      synth.speak(utterance);
+      lastSpokenMessage = message;
+    }
+
+    // === Сензор логика ===
+    let active = false;
+
+    window.startSensor = function() { // правя ги глобални за бутоните
+      active = true;
+    };
+
+    window.stopSensor = function() {
+      active = false;
+      if (lcdTextEl) lcdTextEl.textContent = 'Разстояние: -- см';
+      ledMaterial.color.set(0x00ff00);
+      if (synth) synth.cancel();
+      lastSpokenMessage = "";
+    };
+
+    function updateDistance() {
+      if (!active) return;
+      const distance = Math.round(sensor.position.distanceTo(target.position) * 10) / 10;
+      if (lcdTextEl) lcdTextEl.textContent = `Разстояние: ${distance} см`;
+
+      if (distance < 3) {
+        ledMaterial.color.setHex(0xff0000);
+        speakMessage("Прекалено близо. Разстоянието е " + distance + " сантиметра.");
+      } else if (distance < 5) {
+        ledMaterial.color.setHex(0xffff00);
+        speakMessage("Близо. Разстоянието е " + distance + " сантиметра.");
+      } else {
+        ledMaterial.color.setHex(0x00ff00);
+        speakMessage("Разстоянието е " + distance + " сантиметра.");
+      }
+    }
+
+    // === Влачене с мишка (работи на компютър) ===
+    let isDragging = false;
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    const offset = new THREE.Vector3();
+
+    renderer.domElement.addEventListener('mousedown', function(event) {
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObject(target);
+      if (intersects.length > 0) {
+        isDragging = true;
+        offset.copy(intersects[0].point).sub(target.position);
+      }
+    });
+
+    renderer.domElement.addEventListener('mouseup', () => {
+      isDragging = false;
+    });
+
+    renderer.domElement.addEventListener('mousemove', function(event) {
+      if (!isDragging) return;
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+      const planeZ = new THREE.Plane(new THREE.Vector3(0, 0, 1), -target.position.z);
+      const intersection = new THREE.Vector3();
+      raycaster.ray.intersectPlane(planeZ, intersection);
+      target.position.x = intersection.x - offset.x;
+      target.position.y = intersection.y - offset.y;
+    });
+
+    // === Гласово разпознаване ===
+    let recognition = null;
+    let voiceActive = false;
+
+    window.toggleVoice = function() {
+      if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
+        alert("Браузърът ви не поддържа гласово разпознаване на български език.");
+        return;
+      }
+      if (!recognition) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        recognition = new SpeechRecognition();
+        recognition.lang = 'bg-BG';
+        recognition.continuous = true;
+        recognition.interimResults = false;
+
+        recognition.onresult = function(event) {
+          const transcript = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
+          if (transcript.includes("включи")) window.startSensor();
+          else if (transcript.includes("изключи")) window.stopSensor();
+          else if (transcript.includes("разстояние")) {
+            let distance = Math.round(sensor.position.distanceTo(target.position) * 10) / 10;
+            speakMessage("Разстоянието е " + distance + " сантиметра.");
+          }
+        };
+
+        recognition.onerror = function(e) {
+          console.error("Грешка при гласово разпознаване:", e.error);
+        };
+      }
+
+      if (!voiceActive) {
+        recognition.start();
+        voiceActive = true;
+        if (voiceStatus) voiceStatus.textContent = "🎙️ Гласово разпознаване: активно";
+      } else {
+        recognition.stop();
+        voiceActive = false;
+        if (voiceStatus) voiceStatus.textContent = "🎙️ Гласово разпознаване: изключено";
+      }
+    };
+
+    // === Анимация (включва и VR) ===
+    renderer.setAnimationLoop(() => {
+      if (active) updateDistance();
+      renderer.render(scene, camera);
+    });
+
+    // === Resize ===
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
