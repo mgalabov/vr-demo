@@ -2,34 +2,41 @@
 <html lang="bg">
 <head>
   <meta charset="UTF-8">
-  <title>Сензор + джойстик VR (минимален)</title>
+  <title>VR джойстик дебъг</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body { margin: 0; overflow: hidden; background: #000; }
-    #lcdText, #joyText {
+    #info, #axesInfo, #btnInfo, #distInfo {
       position: absolute;
-      left: 20px;
-      padding: 8px 12px;
+      left: 10px;
+      padding: 6px 10px;
       background: rgba(0,0,0,0.8);
-      color: #a3e635;
+      color: #e5e5e5;
       font-family: monospace;
-      font-size: 16px;
+      font-size: 13px;
       z-index: 10;
+      white-space: pre;
     }
-    #lcdText { top: 20px; }
-    #joyText { top: 60px; color:#38bdf8; }
+    #info     { top: 10px;  color:#a3e635; }
+    #axesInfo { top: 40px;  color:#38bdf8; }
+    #btnInfo  { top: 90px;  color:#f97316; }
+    #distInfo { top: 140px; color:#facc15; }
   </style>
 </head>
 <body>
-  <div id="lcdText">Разстояние: -- см</div>
-  <div id="joyText">Joystick: 0.00, 0.00</div>
+  <div id="info">Sources: --</div>
+  <div id="axesInfo">Axes: []</div>
+  <div id="btnInfo">Buttons: []</div>
+  <div id="distInfo">Разстояние: -- см</div>
 
   <script type="module">
     import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
     import { VRButton } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/webxr/VRButton.js";
 
-    const lcdText = document.getElementById('lcdText');
-    const joyText = document.getElementById('joyText');
+    const infoEl     = document.getElementById('info');
+    const axesInfoEl = document.getElementById('axesInfo');
+    const btnInfoEl  = document.getElementById('btnInfo');
+    const distInfoEl = document.getElementById('distInfo');
 
     // --- Сцена, камера, рендърер ---
     const scene = new THREE.Scene();
@@ -70,7 +77,7 @@
     grid.position.y = 0.001;
     scene.add(grid);
 
-    // --- Обекти: сензор, цел (червена топка), LED ---
+    // --- Обекти: сензор, топка, LED ---
     const sensor = new THREE.Mesh(
       new THREE.BoxGeometry(0.6, 0.3, 0.3),
       new THREE.MeshStandardMaterial({ color: 0x00ffcc })
@@ -94,58 +101,16 @@
     led.position.set(0.8, 1.4, -2.5);
     scene.add(led);
 
-    // --- WebXR session за достъп до джойстика ---
-    let xrSession = null;
-
-    renderer.xr.addEventListener('sessionstart', () => {
-      xrSession = renderer.xr.getSession();
-    });
-
-    renderer.xr.addEventListener('sessionend', () => {
-      xrSession = null;
-    });
-
-    // --- Четене на джойстика и местене на червената топка ---
-    function updateFromJoystick(delta) {
-      if (!xrSession) return;
-
-      const inputSources = xrSession.inputSources;
-      if (!inputSources || inputSources.length === 0) return;
-
-      // Намираме първия контролер, който има gamepad с оси
-      let gamepad = null;
-      for (const src of inputSources) {
-        if (src && src.gamepad && src.gamepad.axes && src.gamepad.axes.length >= 2) {
-          gamepad = src.gamepad;
-          break;
-        }
-      }
-      if (!gamepad) return;
-
-      const axX = gamepad.axes[0] || 0;  // ляво/дясно
-      const axY = gamepad.axes[1] || 0;  // напред/назад
-
-      joyText.textContent = `Joystick: ${axX.toFixed(2)}, ${axY.toFixed(2)}`;
-
-      const speed = 1.5 * delta; // „скорост“ на движение
-
-      // Движим топката в равнина X/Y, Z фиксирано на -3
-      target.position.x += axX * speed;
-      target.position.y += -axY * speed; // минус, за да е интуитивно
-
-      target.position.z = -3;
-
-      // Ограничения да не бяга прекалено
-      target.position.x = THREE.MathUtils.clamp(target.position.x, -1.5, 1.5);
-      target.position.y = THREE.MathUtils.clamp(target.position.y, 0.5, 2.2);
+    // --- WebXR session ---
+    function getXRSession() {
+      return renderer.xr.getSession ? renderer.xr.getSession() : null;
     }
 
-    // --- Разстояние и LED логика ---
+    // --- Разстояние и LED ---
     function updateDistance() {
-      const d = sensor.position.distanceTo(target.position); // в „метри“
-      const cm = Math.round(d * 100); // условни сантиметри
-
-      lcdText.textContent = `Разстояние: ${cm} см`;
+      const d = sensor.position.distanceTo(target.position);
+      const cm = Math.round(d * 100); // условни "сантиметри"
+      distInfoEl.textContent = `Разстояние: ${cm} см`;
 
       if (cm < 30) {
         ledMat.color.set(0xff0000);
@@ -156,6 +121,84 @@
       }
     }
 
+    // --- Четене на всички оси / бутони и местене на топката ---
+    function updateGamepad(delta) {
+      const session = getXRSession();
+      if (!session) {
+        infoEl.textContent = "Sources: (няма XR сесия)";
+        axesInfoEl.textContent = "Axes: []";
+        btnInfoEl.textContent  = "Buttons: []";
+        return;
+      }
+
+      const sources = session.inputSources || [];
+      infoEl.textContent = `Sources: ${sources.length}`;
+
+      let axesText = "";
+      let btnText  = "";
+      let moveX = 0;
+      let moveY = 0;
+
+      for (let si = 0; si < sources.length; si++) {
+        const src = sources[si];
+        if (!src.gamepad) {
+          axesText += `#${si}: (no gamepad)\n`;
+          continue;
+        }
+        const gp = src.gamepad;
+
+        // оси
+        const axes = gp.axes || [];
+        axesText += `#${si} axes: [${axes.map(a => a.toFixed(2)).join(", ")}]\n`;
+
+        // бутони
+        const btns = gp.buttons || [];
+        const btnStates = btns.map(b => (b.pressed ? "1" : "0")).join("");
+        btnText += `#${si} btn: ${btnStates}\n`;
+
+        // избор на "най-активните" две оси за движение
+        if (axes.length >= 2) {
+          // намираме индексите на двете най-големи по абсолютна стойност оси
+          let first = 0, second = 1;
+          for (let i = 0; i < axes.length; i++) {
+            if (Math.abs(axes[i]) > Math.abs(axes[first])) {
+              second = first;
+              first = i;
+            } else if (i !== first && Math.abs(axes[i]) > Math.abs(axes[second])) {
+              second = i;
+            }
+          }
+
+          const axX = axes[first] || 0;
+          const axY = axes[second] || 0;
+
+          // Накрая ще използваме осите от ПЪРВИЯ gamepad, който намерим
+          moveX = axX;
+          moveY = axY;
+          break; // стига ни един контролер
+        }
+      }
+
+      axesInfoEl.textContent = axesText || "Axes: []";
+      btnInfoEl.textContent  = btnText  || "Buttons: []";
+
+      // ако няма оси – не местим
+      if (moveX === 0 && moveY === 0) return;
+
+      const deadZone = 0.15;
+      if (Math.abs(moveX) < deadZone && Math.abs(moveY) < deadZone) return;
+
+      const speed = 1.5 * delta;
+
+      target.position.x += moveX * speed;
+      target.position.y += -moveY * speed; // минус за по-интуитивно
+
+      target.position.z = -3;
+
+      target.position.x = THREE.MathUtils.clamp(target.position.x, -1.5, 1.5);
+      target.position.y = THREE.MathUtils.clamp(target.position.y, 0.5, 2.2);
+    }
+
     // --- Анимация ---
     let lastTime = 0;
     renderer.setAnimationLoop((time) => {
@@ -164,7 +207,7 @@
 
       sensor.rotation.y += delta * 0.5;
 
-      updateFromJoystick(delta);
+      updateGamepad(delta);
       updateDistance();
 
       renderer.render(scene, camera);
