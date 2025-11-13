@@ -2,17 +2,10 @@
 <html lang="bg">
 <head>
   <meta charset="UTF-8">
-  <title>Сензор с камера, глас и VR</title>
+  <title>Сензор + джойстик VR</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body { margin: 0; overflow: hidden; }
-    #cameraFeed {
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      object-fit: cover;
-      z-index: -1;
-    }
+    body { margin: 0; overflow: hidden; background: #000; }
     #lcdText {
       position: absolute;
       top: 20px; left: 20px;
@@ -23,256 +16,156 @@
       font-size: 20px;
       z-index: 2;
     }
-    #voiceStatus {
-      position:absolute;
-      top:20px; right:20px;
-      padding:10px;
-      background:black;
-      color:white;
-      font-size:16px;
-      z-index:2;
-    }
-    #controls {
-      position: absolute;
-      top: 80px; left: 20px;
-      z-index: 2;
-    }
-    button { font-size: 18px; margin: 5px; }
   </style>
 </head>
 <body>
-  <!-- Камера фон (на компютър; в очилата може да се игнорира) -->
-  <video id="cameraFeed" autoplay playsinline muted></video>
-
-  <!-- LCD прозорец и статус за гласовия асистент -->
   <div id="lcdText">Разстояние: -- см</div>
-  <div id="voiceStatus">🎙️ Гласов асистент: изключен</div>
-
-  <!-- Бутоните (виждат се в браузъра, НЕ вътре във VR) -->
-  <div id="controls">
-    <button onclick="startSensor()">ВКЛ.</button>
-    <button onclick="stopSensor()">ИЗКЛ.</button>
-    <button onclick="toggleVoice()">🎙️ Гласов контрол</button>
-  </div>
 
   <script type="module">
     import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
     import { VRButton } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/webxr/VRButton.js";
 
-    // === Камера като фон (както в оригинала) ===
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      navigator.mediaDevices.getUserMedia({ video: true }).then(function(stream) {
-        const video = document.getElementById("cameraFeed");
-        if (video) video.srcObject = stream;
-      }).catch(function(error) {
-        console.error("Камерата не можа да бъде включена:", error);
-      });
-    }
-
-    // === THREE.js сцена ===
+    // --- Сцена, камера, рендърер ---
     const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x000000);
+    scene.fog = new THREE.Fog(0x000000, 0.1, 20);
 
     const camera = new THREE.PerspectiveCamera(
-      75,
+      70,
       window.innerWidth / window.innerHeight,
       0.1,
-      1000
+      100
     );
+    camera.position.set(0, 1.6, 0);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.domElement.style.position = "absolute";
-    renderer.domElement.style.top = "0";
-    renderer.domElement.style.left = "0";
-    renderer.domElement.style.zIndex = "0";
-    renderer.setClearColor(0x000000, 0); // прозрачен фон над видеото
-    document.body.appendChild(renderer.domElement);
-
-    // 🔹 WebXR активиране + VR бутон (както в демотата)
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.xr.enabled = true;
+    document.body.appendChild(renderer.domElement);
     document.body.appendChild(VRButton.createButton(renderer));
 
-    // Светлина
-    const light = new THREE.AmbientLight(0xffffff, 1);
-    scene.add(light);
+    // --- Светлини и под ---
+    const hemi = new THREE.HemisphereLight(0xffffff, 0x222233, 1.0);
+    scene.add(hemi);
 
-    // === ОБЕКТИ – СЕНЗОР, ТОПКА, LED ===
+    const dir = new THREE.DirectionalLight(0xffffff, 0.7);
+    dir.position.set(3, 5, 2);
+    scene.add(dir);
+
+    const floorGeo = new THREE.CircleGeometry(5, 64);
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x202225, roughness: 1 });
+    const floor = new THREE.Mesh(floorGeo, floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = 0;
+    scene.add(floor);
+
+    const grid = new THREE.GridHelper(10, 20, 0x555555, 0x333333);
+    grid.position.y = 0.001;
+    scene.add(grid);
+
+    // --- Обекти: сензор, цел (червена топка), LED ---
     const sensor = new THREE.Mesh(
-      new THREE.BoxGeometry(1, 0.5, 0.5),
+      new THREE.BoxGeometry(0.6, 0.3, 0.3),
       new THREE.MeshStandardMaterial({ color: 0x00ffcc })
     );
-    // пред теб, малко под очите
     sensor.position.set(0, 1.4, -2);
     scene.add(sensor);
 
-    const targetMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+    const targetMat = new THREE.MeshStandardMaterial({ color: 0xff0000 });
     const target = new THREE.Mesh(
-      new THREE.SphereGeometry(0.3, 16, 16),
-      targetMaterial
+      new THREE.SphereGeometry(0.25, 24, 16),
+      targetMat
     );
-    // още малко по-далеч
     target.position.set(0, 1.4, -3);
     scene.add(target);
 
-    const ledMaterial = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
+    const ledMat = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
     const led = new THREE.Mesh(
-      new THREE.SphereGeometry(0.2, 16, 16),
-      ledMaterial
+      new THREE.SphereGeometry(0.15, 16, 16),
+      ledMat
     );
-    // вдясно от сензора
-    led.position.set(1.5, 1.4, -2.5);
+    led.position.set(0.8, 1.4, -2.5);
     scene.add(led);
 
-    // Камера (VR „глава“)
-    camera.position.set(0, 1.6, 0);
+    const lcdText = document.getElementById('lcdText');
 
-    const lcdTextEl   = document.getElementById('lcdText');
-    const voiceStatus = document.getElementById('voiceStatus');
+    // --- Джойстик контрол (контролер 0) ---
+    let session = null;
 
-    // === Text-to-Speech (гласов асистент) – както в оригинала ===
-    const synth = window.speechSynthesis;
-    let lastSpokenMessage = "";
+    renderer.xr.addEventListener('sessionstart', () => {
+      session = renderer.xr.getSession();
+    });
 
-    function speakMessage(message) {
-      if (!synth) return;
-      if (lastSpokenMessage === message) return;
-      const utterance = new SpeechSynthesisUtterance(message);
-      utterance.lang = 'bg-BG';
-      synth.cancel();
-      synth.speak(utterance);
-      lastSpokenMessage = message;
+    renderer.xr.addEventListener('sessionend', () => {
+      session = null;
+    });
+
+    function updateFromJoystick(delta) {
+      if (!session) return;
+      const inputSources = session.inputSources;
+      if (!inputSources || inputSources.length === 0) return;
+
+      // Взимаме първия контролер с gamepad
+      let gamepad = null;
+      for (const src of inputSources) {
+        if (src && src.gamepad && src.gamepad.axes && src.gamepad.axes.length >= 2) {
+          gamepad = src.gamepad;
+          break;
+        }
+      }
+      if (!gamepad) return;
+
+      // Оси на джойстика (обикновено [0]=ляво/дясно, [1]=напред/назад)
+      const axX = gamepad.axes[0] || 0;
+      const axY = gamepad.axes[1] || 0;
+
+      const speed = 1.0 * delta; // скорост на движение
+
+      // Движим топката в равнина X/Y пред сензора (Z почти фиксирано на -3)
+      target.position.x += axX * speed;
+      target.position.y += -axY * speed; // минус, за да е интуитивно
+
+      // Фиксираме Z около -3
+      target.position.z = -3;
+
+      // Ограничения да не излиза извън кадър
+      target.position.x = THREE.MathUtils.clamp(target.position.x, -1.5, 1.5);
+      target.position.y = THREE.MathUtils.clamp(target.position.y, 0.5, 2.2);
     }
 
-    // === Логика на сензора ===
-    let active = false;
-
-    window.startSensor = function() {
-      active = true;
-    };
-
-    window.stopSensor = function() {
-      active = false;
-      lcdTextEl.textContent = 'Разстояние: -- см';
-      ledMaterial.color.set(0x00ff00);
-      if (synth) synth.cancel();
-      lastSpokenMessage = "";
-    };
-
+    // --- Логика за разстоянието и LED ---
     function updateDistance() {
-      // Реално разстояние между сензора и топката
-      const distanceWorld = sensor.position.distanceTo(target.position);
-      // Условни "сантиметри" – просто скала
-      const distance = Math.round(distanceWorld * 100); // 1 единица = 1 м → *100 ≈ см
+      const d = sensor.position.distanceTo(target.position); // в "метри"
+      const cm = Math.round(d * 100); // условни сантиметри
 
-      lcdTextEl.textContent = `Разстояние: ${distance} см`;
+      lcdText.textContent = `Разстояние: ${cm} см`;
 
-      if (!active) return;
-
-      if (distance < 30) {              // по-малко от 30 см
-        ledMaterial.color.setHex(0xff0000);
-        speakMessage("Прекалено близо. Разстоянието е " + distance + " сантиметра.");
-      } else if (distance < 60) {       // между 30 и 60 см
-        ledMaterial.color.setHex(0xffff00);
-        speakMessage("Близо. Разстоянието е " + distance + " сантиметра.");
+      if (cm < 30) {
+        ledMat.color.set(0xff0000);
+      } else if (cm < 60) {
+        ledMat.color.set(0xffff00);
       } else {
-        ledMaterial.color.setHex(0x00ff00);
-        speakMessage("Разстоянието е " + distance + " сантиметра.");
+        ledMat.color.set(0x00ff00);
       }
     }
 
-    // === Влачене на ЧЕРВЕНАТА ТОПКА с МИШКА (както искаш) ===
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
-    let isDragging = false;
-    const offset = new THREE.Vector3();
+    // --- Анимационен цикъл ---
+    let lastTime = 0;
+    renderer.setAnimationLoop((time) => {
+      const delta = (time - lastTime) / 1000;
+      lastTime = time;
 
-    // Плоскост на която местим топката – фиксирана около z = -3
-    const dragPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 3); // z = -3
+      // леко въртене на сензора, за да има движение
+      sensor.rotation.y += delta * 0.5;
 
-    renderer.domElement.addEventListener('mousedown', function(event) {
-      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-      raycaster.setFromCamera(mouse, camera);
-      const intersects = raycaster.intersectObject(target);
-      if (intersects.length > 0) {
-        isDragging = true;
-        offset.copy(intersects[0].point).sub(target.position);
-      }
-    });
-
-    renderer.domElement.addEventListener('mouseup', () => {
-      isDragging = false;
-    });
-
-    renderer.domElement.addEventListener('mousemove', function(event) {
-      if (!isDragging) return;
-      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-      raycaster.setFromCamera(mouse, camera);
-
-      const intersection = new THREE.Vector3();
-      raycaster.ray.intersectPlane(dragPlane, intersection);
-      target.position.x = intersection.x - offset.x;
-      target.position.y = intersection.y - offset.y;
-    });
-
-    // === Гласово разпознаване (както в твоя файл) ===
-    let recognition = null;
-    let voiceActive = false;
-
-    window.toggleVoice = function() {
-      if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
-        alert("Браузърът ви не поддържа гласово разпознаване на български.");
-        return;
-      }
-      if (!recognition) {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        recognition = new SpeechRecognition();
-        recognition.lang = 'bg-BG';
-        recognition.continuous = true;
-        recognition.interimResults = false;
-
-        recognition.onresult = function(event) {
-          const transcript = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
-          console.log("Гласова команда:", transcript);
-
-          if (transcript.includes("включи")) {
-            window.startSensor();
-            speakMessage("Сензорът е включен.");
-          } else if (transcript.includes("изключи")) {
-            window.stopSensor();
-            speakMessage("Сензорът е изключен.");
-          } else if (transcript.includes("разстояние")) {
-            // казва текущото разстояние
-            const distanceWorld = sensor.position.distanceTo(target.position);
-            const distance = Math.round(distanceWorld * 100);
-            speakMessage("Разстоянието е " + distance + " сантиметра.");
-          }
-        };
-
-        recognition.onerror = function(e) {
-          console.error("Грешка при гласово разпознаване:", e.error);
-        };
-      }
-
-      if (!voiceActive) {
-        recognition.start();
-        voiceActive = true;
-        voiceStatus.textContent = "🎙️ Гласов асистент: активен";
-      } else {
-        recognition.stop();
-        voiceActive = false;
-        voiceStatus.textContent = "🎙️ Гласов асистент: изключен";
-      }
-    };
-
-    // === Рендер цикъл (вкл. VR) ===
-    renderer.setAnimationLoop(() => {
+      updateFromJoystick(delta);
       updateDistance();
+
       renderer.render(scene, camera);
     });
 
-    // === Resize ===
+    // --- Resize ---
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
