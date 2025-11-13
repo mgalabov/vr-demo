@@ -2,28 +2,34 @@
 <html lang="bg">
 <head>
   <meta charset="UTF-8">
-  <title>Сензор + джойстик VR</title>
+  <title>Сензор + джойстик VR (минимален)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body { margin: 0; overflow: hidden; background: #000; }
-    #lcdText {
+    #lcdText, #joyText {
       position: absolute;
-      top: 20px; left: 20px;
-      color: lime;
-      background: black;
+      left: 20px;
+      padding: 8px 12px;
+      background: rgba(0,0,0,0.8);
+      color: #a3e635;
       font-family: monospace;
-      padding: 10px;
-      font-size: 20px;
-      z-index: 2;
+      font-size: 16px;
+      z-index: 10;
     }
+    #lcdText { top: 20px; }
+    #joyText { top: 60px; color:#38bdf8; }
   </style>
 </head>
 <body>
   <div id="lcdText">Разстояние: -- см</div>
+  <div id="joyText">Joystick: 0.00, 0.00</div>
 
   <script type="module">
     import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
     import { VRButton } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/webxr/VRButton.js";
+
+    const lcdText = document.getElementById('lcdText');
+    const joyText = document.getElementById('joyText');
 
     // --- Сцена, камера, рендърер ---
     const scene = new THREE.Scene();
@@ -45,7 +51,7 @@
     document.body.appendChild(renderer.domElement);
     document.body.appendChild(VRButton.createButton(renderer));
 
-    // --- Светлини и под ---
+    // --- Светлина и под ---
     const hemi = new THREE.HemisphereLight(0xffffff, 0x222233, 1.0);
     scene.add(hemi);
 
@@ -88,25 +94,25 @@
     led.position.set(0.8, 1.4, -2.5);
     scene.add(led);
 
-    const lcdText = document.getElementById('lcdText');
-
-    // --- Джойстик контрол (контролер 0) ---
-    let session = null;
+    // --- WebXR session за достъп до джойстика ---
+    let xrSession = null;
 
     renderer.xr.addEventListener('sessionstart', () => {
-      session = renderer.xr.getSession();
+      xrSession = renderer.xr.getSession();
     });
 
     renderer.xr.addEventListener('sessionend', () => {
-      session = null;
+      xrSession = null;
     });
 
+    // --- Четене на джойстика и местене на червената топка ---
     function updateFromJoystick(delta) {
-      if (!session) return;
-      const inputSources = session.inputSources;
+      if (!xrSession) return;
+
+      const inputSources = xrSession.inputSources;
       if (!inputSources || inputSources.length === 0) return;
 
-      // Взимаме първия контролер с gamepad
+      // Намираме първия контролер, който има gamepad с оси
       let gamepad = null;
       for (const src of inputSources) {
         if (src && src.gamepad && src.gamepad.axes && src.gamepad.axes.length >= 2) {
@@ -116,27 +122,27 @@
       }
       if (!gamepad) return;
 
-      // Оси на джойстика (обикновено [0]=ляво/дясно, [1]=напред/назад)
-      const axX = gamepad.axes[0] || 0;
-      const axY = gamepad.axes[1] || 0;
+      const axX = gamepad.axes[0] || 0;  // ляво/дясно
+      const axY = gamepad.axes[1] || 0;  // напред/назад
 
-      const speed = 1.0 * delta; // скорост на движение
+      joyText.textContent = `Joystick: ${axX.toFixed(2)}, ${axY.toFixed(2)}`;
 
-      // Движим топката в равнина X/Y пред сензора (Z почти фиксирано на -3)
+      const speed = 1.5 * delta; // „скорост“ на движение
+
+      // Движим топката в равнина X/Y, Z фиксирано на -3
       target.position.x += axX * speed;
       target.position.y += -axY * speed; // минус, за да е интуитивно
 
-      // Фиксираме Z около -3
       target.position.z = -3;
 
-      // Ограничения да не излиза извън кадър
+      // Ограничения да не бяга прекалено
       target.position.x = THREE.MathUtils.clamp(target.position.x, -1.5, 1.5);
       target.position.y = THREE.MathUtils.clamp(target.position.y, 0.5, 2.2);
     }
 
-    // --- Логика за разстоянието и LED ---
+    // --- Разстояние и LED логика ---
     function updateDistance() {
-      const d = sensor.position.distanceTo(target.position); // в "метри"
+      const d = sensor.position.distanceTo(target.position); // в „метри“
       const cm = Math.round(d * 100); // условни сантиметри
 
       lcdText.textContent = `Разстояние: ${cm} см`;
@@ -150,13 +156,12 @@
       }
     }
 
-    // --- Анимационен цикъл ---
+    // --- Анимация ---
     let lastTime = 0;
     renderer.setAnimationLoop((time) => {
       const delta = (time - lastTime) / 1000;
       lastTime = time;
 
-      // леко въртене на сензора, за да има движение
       sensor.rotation.y += delta * 0.5;
 
       updateFromJoystick(delta);
