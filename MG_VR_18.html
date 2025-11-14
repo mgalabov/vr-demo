@@ -233,22 +233,7 @@ floorGroup.visible = true;
     };
 
     let currentZone = null;
-    let zoneAudioUnlocked = false;
-
-    // извиква се веднъж след човешко действие, за да разрешим звука
-    function unlockZoneAudio() {
-      if (zoneAudioUnlocked) return;
-      zoneAudioUnlocked = true;
-
-      Object.values(zoneAudio).forEach(a => {
-        a.muted = false;
-        a.play().then(() => {
-          a.pause();
-          a.currentTime = 0;
-        }).catch(() => {
-          // игнорираме грешката, ако браузърът не позволи
-        });
-      });
+   
     }
 
     // Пуска звук само при СМЯНА на зона
@@ -313,10 +298,28 @@ floorGroup.visible = true;
     // ==========================================================
     let sensorActive = false;
 
-    window.startSensor = () => {
-      sensorActive = true;
-      unlockZoneAudio();   // ← добавяме отключване на звука
-    };
+  window.startSensor = () => {
+  sensorActive = true;
+
+  // Пускаме всеки звук по 1 път тихо, за да се разреши аудиото на Quest
+  zoneAudio.green.volume = 0.001;
+  zoneAudio.yellow.volume = 0.001;
+  zoneAudio.red.volume = 0.001;
+
+  zoneAudio.green.play();
+  zoneAudio.yellow.play();
+  zoneAudio.red.play();
+
+  setTimeout(() => {
+    zoneAudio.green.pause();
+    zoneAudio.yellow.pause();
+    zoneAudio.red.pause();
+
+    zoneAudio.green.volume = 1.0;
+    zoneAudio.yellow.volume = 1.0;
+    zoneAudio.red.volume = 1.0;
+  }, 300);
+};
 
 
  window.stopSensor = () => {
