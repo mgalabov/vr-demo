@@ -128,10 +128,10 @@
     grid.position.set(0, 0.01, 0);         // малко над пода
     floorGroup.add(grid);
 
-    // Подът НЕ се мести
-    floorGroup.position.set(0, 0, 0);
-    floorGroup.rotation.set(0, 0, 0);
-    floorGroup.visible = true;
+// Подът НЕ се мести, само го сваляме с 0.25 m
+floorGroup.position.set(0, -0.25, 0);
+floorGroup.rotation.set(0, 0, 0);
+floorGroup.visible = true;
 
     // ==========================================================
     // Обекти: сензор, червена топка, LED (над пода)
