@@ -4,10 +4,29 @@
   <meta charset="UTF-8">
   <title>WebXR Raspberry Pi Zero</title>
   <style>
-    body { margin: 0; overflow: hidden; background: #000; }
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #000;
+      font-family: sans-serif;
+    }
+    #debug {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 100;
+      color: #00ff00;
+      background: rgba(0,0,0,0.6);
+      padding: 8px 12px;
+      font-size: 14px;
+    }
   </style>
 </head>
 <body>
+
+<div id="debug">
+  Страницата се зареди, но още не знаем дали скриптовете работят...
+</div>
 
 <!-- Three.js и помощни скриптове (НЕ-модулна версия) -->
 <script src="https://unpkg.com/three@0.165.0/build/three.min.js"></script>
@@ -15,71 +34,82 @@
 <script src="https://unpkg.com/three@0.165.0/examples/js/webxr/VRButton.js"></script>
 
 <script>
-  // --- СЦЕНА ---
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x222222);
+  const debugBox = document.getElementById('debug');
+  debugBox.textContent = 'Скриптовете се заредиха, инициализирам сцена...';
 
-  // --- КАМЕРА ---
-  const camera = new THREE.PerspectiveCamera(
-    70, window.innerWidth / window.innerHeight, 0.01, 50
-  );
-  camera.position.set(0, 1.6, 1.5);
+  try {
+    // --- СЦЕНА ---
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x222222);
 
-  // --- РЕНДЕРЕР ---
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.xr.enabled = true;
-  document.body.appendChild(renderer.domElement);
+    // --- КАМЕРА ---
+    const camera = new THREE.PerspectiveCamera(
+      70, window.innerWidth / window.innerHeight, 0.01, 50
+    );
+    camera.position.set(0, 1.6, 1.5);
 
-  // --- VR БУТОН ---
-  document.body.appendChild(VRButton.createButton(renderer));
-
-  // --- СВЕТЛИНИ ---
-  const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0);
-  scene.add(hemi);
-
-  const dir = new THREE.DirectionalLight(0xffffff, 1.0);
-  dir.position.set(3, 5, 2);
-  scene.add(dir);
-
-  // --- ПОД (РЕШЕТКА) ---
-  const grid = new THREE.GridHelper(4, 40, 0x444444, 0x222222);
-  grid.position.y = 0;
-  scene.add(grid);
-
-  // --- ЗАРЕЖДАНЕ НА GLB МОДЕЛА ---
-  const loader = new THREE.GLTFLoader();
-  loader.load(
-    'model.glb',       // ТУК ИМЕТО НА ФАЙЛА ТИ
-    function (gltf) {
-      const model = gltf.scene;
-
-      // позиция и размер
-      model.position.set(0, 1, -0.8);
-      model.scale.set(0.001, 0.001, 0.001); // ако е в мм → свиваме до метри
-
-      // лек наклон, за да го гледаш отгоре
-      model.rotation.x = -0.5;
-
-      scene.add(model);
-    },
-    undefined,
-    function (error) {
-      console.error('Грешка при зареждане на model.glb:', error);
-    }
-  );
-
-  // --- REZIZE ---
-  window.addEventListener('resize', function () {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
+    // --- РЕНДЕРЕР ---
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
-  });
+    renderer.xr.enabled = true;
+    document.body.appendChild(renderer.domElement);
 
-  // --- РЕНДЕР ЦИКЪЛ ---
-  renderer.setAnimationLoop(function () {
-    renderer.render(scene, camera);
-  });
+    // --- VR БУТОН ---
+    const vrButton = VRButton.createButton(renderer);
+    document.body.appendChild(vrButton);
+
+    // --- СВЕТЛИНИ ---
+    const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0);
+    scene.add(hemi);
+
+    const dir = new THREE.DirectionalLight(0xffffff, 1.0);
+    dir.position.set(3, 5, 2);
+    scene.add(dir);
+
+    // --- ПОД (РЕШЕТКА) ---
+    const grid = new THREE.GridHelper(4, 40, 0x444444, 0x222222);
+    grid.position.y = 0;
+    scene.add(grid);
+
+    // --- ЗАРЕЖДАНЕ НА GLB МОДЕЛА ---
+    const loader = new THREE.GLTFLoader();
+    loader.load(
+      'model.glb',       // увери се, че файлът се казва точно така
+      function (gltf) {
+        const model = gltf.scene;
+
+        // позиция и размер
+        model.position.set(0, 1, -0.8);
+        model.scale.set(0.001, 0.001, 0.001); // ако е в мм → свиваме до метри
+
+        model.rotation.x = -0.5;
+
+        scene.add(model);
+        debugBox.textContent = 'Всичко тръгна: трябва да виждаш решетка и бутон "Enter VR".';
+      },
+      undefined,
+      function (error) {
+        console.error('Грешка при зареждане на model.glb:', error);
+        debugBox.textContent = 'Сцената тръгна, но model.glb не се зарежда (виж конзолата).';
+      }
+    );
+
+    // --- RESIZE ---
+    window.addEventListener('resize', function () {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // --- РЕНДЕР ЦИКЪЛ ---
+    renderer.setAnimationLoop(function () {
+      renderer.render(scene, camera);
+    });
+
+  } catch (e) {
+    console.error(e);
+    debugBox.textContent = 'Има грешка в JS кода: ' + e.message;
+  }
 </script>
 
 </body>
