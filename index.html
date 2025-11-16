@@ -2,16 +2,33 @@
 <html lang="bg">
 <head>
   <meta charset="UTF-8" />
-  <title>Raspberry Pi Zero – WebXR с GLB модел</title>
+  <title>Raspberry Pi Zero – WebXR с GLB модел (debug)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     body { margin: 0; overflow: hidden; background: #000; }
     canvas { display: block; }
+    #debug {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      padding: 6px 10px;
+      background: rgba(0,0,0,0.7);
+      color: #00ff00;
+      font-family: monospace;
+      font-size: 13px;
+      white-space: pre-line;
+      z-index: 10;
+    }
   </style>
 </head>
 <body>
+<div id="debug">Старт на страницата...</div>
+
 <script type="module">
-  // Импорти – същият стил като в твоя работещ пример
+  const debug = document.getElementById('debug');
+  debug.textContent = 'JS модулът се зареди...';
+
+  // Импорти – същият стил като в работещия пример
   import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
   import { XRButton } from 'https://unpkg.com/three@0.160.0/examples/jsm/webxr/XRButton.js';
   import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
@@ -22,6 +39,8 @@
   animate();
 
   function init() {
+    debug.textContent = 'Инициализиране на сцена...';
+
     // Сцена
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x101010);
@@ -64,10 +83,12 @@
     debugCube.position.set(0, 1.6, -0.6); // точно пред очите
     scene.add(debugCube);
 
+    debug.textContent = 'Сцена и светлини са готови.\nОпит за зареждане на model1.glb...';
+
     // Зареждане на GLB модела
     const loader = new GLTFLoader();
     loader.load(
-      'model1.glb',   // ИМЕТО НА ТВОЯ ФАЙЛ
+      'model1.glb',   // Твоят файл – както ти каза, така се казва
       (gltf) => {
         const model = gltf.scene;
 
@@ -79,14 +100,13 @@
         // Ако е в метри → пробвай 1.0
         model.scale.set(0.01, 0.01, 0.01);
 
-        // По желание малко наклон, да го гледаш "отгоре":
-        // model.rotation.x = -Math.PI / 2;
-
         scene.add(model);
+        debug.textContent = 'model1.glb е зареден успешно.\nТрябва да виждаш решетка, жълто кубче и платката.';
       },
       undefined,
       (err) => {
-        console.error('Грешка при зареждане на raspberry_pi_zero.glb:', err);
+        console.error('Грешка при зареждане на model1.glb:', err);
+        debug.textContent = 'Грешка при зареждане на model1.glb.\nВиж конзолата на браузъра.\n' + (err.message || '');
       }
     );
 
