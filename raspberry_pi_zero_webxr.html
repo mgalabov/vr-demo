@@ -2,7 +2,7 @@
 <html lang="bg">
 <head>
   <meta charset="UTF-8" />
-  <title>Raspberry Pi Zero – WebXR demo</title>
+  <title>Raspberry Pi Zero – WebXR spin demo</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     body { margin: 0; overflow: hidden; background: #000; }
@@ -34,31 +34,34 @@
     document.body.appendChild(renderer.domElement);
     document.body.appendChild(XRButton.createButton(renderer));
 
-    const light = new THREE.HemisphereLight(0xffffff, 0x222222, 1.2);
+    const light = new THREE.HemisphereLight(0xffffff, 0x222222, 1.5);
     scene.add(light);
 
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    dirLight.position.set(1, 2, 1);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    dirLight.position.set(2, 3, 1);
     scene.add(dirLight);
 
+    // Група за платката
     boardGroup = new THREE.Group();
     scene.add(boardGroup);
 
-    // по-ниско и по-близо
-    boardGroup.position.set(0, 1.2, -0.35);
+    // По-ниско, по-близко и по-голямо
+    boardGroup.position.set(0, 1.1, -0.25);
+    boardGroup.scale.set(2.5, 2.5, 2.5);  // Увеличаваме всичко
+    boardGroup.rotation.set(0.6, 0.4, 0.2); // начално наклонена
 
-    // размери в метри
+    // === Размери (в метри, преди скалирането) ===
     const boardLength = 0.065;
     const boardWidth  = 0.030;
     const boardThick  = 0.003;
 
-    // платка
+    // Платка
     const boardGeom = new THREE.BoxGeometry(boardLength, boardThick, boardWidth);
     const boardMat  = new THREE.MeshStandardMaterial({ color: 0x006633 });
     const board     = new THREE.Mesh(boardGeom, boardMat);
     boardGroup.add(board);
 
-    // монтажни отвори
+    // Монтажни отвори
     const holeRadius = 0.004;
     const holeHeight = 0.0025;
     const holeGeom = new THREE.CylinderGeometry(holeRadius, holeRadius, holeHeight, 24);
@@ -131,6 +134,10 @@
     gpio.position.set(0.000, boardThick / 2 + 0.002, boardWidth/2 - 0.004);
     boardGroup.add(gpio);
 
+    // За да е явно, че се върти в 3D – добавяме оси
+    const axesHelper = new THREE.AxesHelper(0.1);
+    boardGroup.add(axesHelper);
+
     window.addEventListener('resize', onWindowResize);
   }
 
@@ -146,7 +153,10 @@
 
   function render() {
     if (boardGroup) {
-      boardGroup.rotation.y += 0.01;
+      // Ясно въртене по трите оси
+      boardGroup.rotation.x += 0.03;
+      boardGroup.rotation.y += 0.04;
+      boardGroup.rotation.z += 0.02;
     }
     renderer.render(scene, camera);
   }
