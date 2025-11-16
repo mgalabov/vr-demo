@@ -2,7 +2,7 @@
 <html lang="bg">
 <head>
   <meta charset="UTF-8" />
-  <title>Raspberry Pi Zero – WebXR spin demo</title>
+  <title>Raspberry Pi Zero – WebXR spin (time-based)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     body { margin: 0; overflow: hidden; background: #000; }
@@ -45,12 +45,11 @@
     boardGroup = new THREE.Group();
     scene.add(boardGroup);
 
-    // По-ниско, по-близко и по-голямо
-    boardGroup.position.set(0, 1.1, -0.25);
-    boardGroup.scale.set(2.5, 2.5, 2.5);  // Увеличаваме всичко
-    boardGroup.rotation.set(0.6, 0.4, 0.2); // начално наклонена
+    // Позиция и скала
+    boardGroup.position.set(0, 1.2, -0.3);
+    boardGroup.scale.set(3.0, 3.0, 3.0);
 
-    // === Размери (в метри, преди скалирането) ===
+    // Размери (в метри преди скалирането)
     const boardLength = 0.065;
     const boardWidth  = 0.030;
     const boardThick  = 0.003;
@@ -134,7 +133,7 @@
     gpio.position.set(0.000, boardThick / 2 + 0.002, boardWidth/2 - 0.004);
     boardGroup.add(gpio);
 
-    // За да е явно, че се върти в 3D – добавяме оси
+    // Помощни оси – да личи, че се върти в 3D
     const axesHelper = new THREE.AxesHelper(0.1);
     boardGroup.add(axesHelper);
 
@@ -151,12 +150,13 @@
     renderer.setAnimationLoop(render);
   }
 
-  function render() {
+  function render(timestamp) {
     if (boardGroup) {
-      // Ясно въртене по трите оси
-      boardGroup.rotation.x += 0.03;
-      boardGroup.rotation.y += 0.04;
-      boardGroup.rotation.z += 0.02;
+      const t = timestamp * 0.001; // секунди
+      // Ясно, базирано на време въртене по трите оси (тумбелиране)
+      boardGroup.rotation.x = t * 0.9;
+      boardGroup.rotation.y = t * 1.3;
+      boardGroup.rotation.z = t * 0.7;
     }
     renderer.render(scene, camera);
   }
