@@ -2,7 +2,7 @@
 <html lang="bg">
 <head>
   <meta charset="UTF-8" />
-  <title>WebXR – два GLB модела (Three.js база)</title>
+  <title>Raspberry Pi Zero – WebXR два борда</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     body { margin: 0; overflow: hidden; background: #000; }
@@ -13,24 +13,20 @@
 <script type="module">
   import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
   import { XRButton } from 'https://unpkg.com/three@0.160.0/examples/jsm/webxr/XRButton.js';
-  import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
   let scene, camera, renderer;
+  let boardGroup1, boardGroup2;
 
   init();
   animate();
 
   function init() {
-
-    // СЦЕНА + ФОН
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x101010);
 
-    // КАМЕРА
     camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
     camera.position.set(0, 1.6, 0);
 
-    // РЕНДЕРЕР
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -38,71 +34,119 @@
     document.body.appendChild(renderer.domElement);
     document.body.appendChild(XRButton.createButton(renderer));
 
-    // СВЕТЛИНИ
-    const light = new THREE.HemisphereLight(0xffffff, 0x222222, 1.2);
+    const light = new THREE.HemisphereLight(0xffffff, 0x222222, 1.5);
     scene.add(light);
 
     const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
     dirLight.position.set(2, 3, 1);
     scene.add(dirLight);
 
-    // ГЛАВНА ГРУПА – всичко вътре се движи заедно
-    const mainGroup = new THREE.Group();
-    scene.add(mainGroup);
+    // -------- ПЪРВИ БОРД (оригиналният ти boardGroup) --------
+    boardGroup1 = new THREE.Group();
+    scene.add(boardGroup1);
 
-    // ============================================
-    // МОДЕЛ 1 (model1.glb)
-    // ============================================
-    const loader = new GLTFLoader();
-    loader.load(
-      "model1.glb",
-      (gltf) => {
-        const m1 = gltf.scene;
-        m1.position.set(-0.25, 1.3, -0.8);    // пред очите, леко вляво
-        m1.scale.set(0.02, 0.02, 0.02);       // нужда от корекция → сменим после
-        mainGroup.add(m1);
-      },
-      undefined,
-      (err) => console.error("model1.glb error:", err)
-    );
+    // позиция и скала (като в оригинала)
+    boardGroup1.position.set(-0.12, 1.2, -0.3);  // леко вляво
+    boardGroup1.scale.set(3.0, 3.0, 3.0);
 
-    // ============================================
-    // МОДЕЛ 2 (model2.glb)
-    // ============================================
-    loader.load(
-      "model2.glb",
-      (gltf) => {
-        const m2 = gltf.scene;
-        m2.position.set(0.25, 1.3, -0.8);     // пред очите, леко вдясно
-        m2.scale.set(0.02, 0.02, 0.02);
-        mainGroup.add(m2);
-      },
-      undefined,
-      (err) => console.error("model2.glb error:", err)
-    );
+    const boardLength = 0.065;
+    const boardWidth  = 0.030;
+    const boardThick  = 0.003;
 
-    // ============================================
-    // ДВА DEBUG ОБЕКТА (ако GLB не се виждат)
-    // ============================================
-    const cube1 = new THREE.Mesh(
-      new THREE.BoxGeometry(0.1, 0.1, 0.1),
-      new THREE.MeshStandardMaterial({ color: 0xff0000 })
-    );
-    cube1.position.set(-0.25, 1.6, -0.8);
-    mainGroup.add(cube1);
+    const boardGeom = new THREE.BoxGeometry(boardLength, boardThick, boardWidth);
+    const boardMat  = new THREE.MeshStandardMaterial({ color: 0x006633 });
+    const board     = new THREE.Mesh(boardGeom, boardMat);
+    boardGroup1.add(board);
 
-    const cube2 = new THREE.Mesh(
-      new THREE.BoxGeometry(0.1, 0.1, 0.1),
-      new THREE.MeshStandardMaterial({ color: 0x00ff00 })
-    );
-    cube2.position.set(0.25, 1.6, -0.8);
-    mainGroup.add(cube2);
+    const holeRadius = 0.004;
+    const holeHeight = 0.0025;
+    const holeGeom = new THREE.CylinderGeometry(holeRadius, holeRadius, holeHeight, 24);
+    const holeMat  = new THREE.MeshStandardMaterial({ color: 0xdddd22 });
 
-    // ============================================
-    // ПОД
-    // ============================================
-    const grid = new THREE.GridHelper(4, 40, 0x555555, 0x333333);
-    grid.position.y = 0;
+    function addHole(group, x, z) {
+      const h = new THREE.Mesh(holeGeom, holeMat);
+      h.position.set(x, boardThick / 2 + holeHeight / 2, z);
+      h.rotation.x = Math.PI / 2;
+      group.add(h);
+    }
+
+    const xOffset = boardLength / 2 - 0.006;
+    const zOffset = boardWidth / 2 - 0.006;
+    addHole(boardGroup1, -xOffset, -zOffset);
+    addHole(boardGroup1, -xOffset,  zOffset);
+    addHole(boardGroup1,  xOffset, -zOffset);
+    addHole(boardGroup1,  xOffset,  zOffset);
+
+    const socGeom = new THREE.BoxGeometry(0.018, 0.003, 0.018);
+    const socMat  = new THREE.MeshStandardMaterial({ color: 0x222222 });
+    const soc     = new THREE.Mesh(socGeom, socMat);
+    soc.position.set(-0.010, boardThick / 2 + 0.002, 0.000);
+    boardGroup1.add(soc);
+
+    const sdGeom = new THREE.BoxGeometry(0.017, 0.003, 0.012);
+    const sdMat  = new THREE.MeshStandardMaterial({ color: 0x777777 });
+    const sd     = new THREE.Mesh(sdGeom, sdMat);
+    sd.position.set(-0.023, boardThick / 2 + 0.002, -0.010);
+    boardGroup1.add(sd);
+
+    const usbGeom = new THREE.BoxGeometry(0.011, 0.004, 0.007);
+    const usbMat  = new THREE.MeshStandardMaterial({ color: 0xaaaaaa });
+
+    const usb1 = new THREE.Mesh(usbGeom, usbMat);
+    usb1.position.set(0.010, boardThick / 2 + 0.002, -boardWidth/2 + 0.004);
+    boardGroup1.add(usb1);
+
+    const usb2 = usb1.clone();
+    usb2.position.x = 0.023;
+    boardGroup1.add(usb2);
+
+    const hdmiGeom = new THREE.BoxGeometry(0.013, 0.004, 0.009);
+    const hdmiMat  = new THREE.MeshStandardMaterial({ color: 0xcccccc });
+    const hdmi     = new THREE.Mesh(hdmiGeom, hdmiMat);
+    hdmi.position.set(0.000, boardThick / 2 + 0.002, -boardWidth/2 + 0.004);
+    boardGroup1.add(hdmi);
+
+    function addChip(group, x, z, sx, sz) {
+      const g = new THREE.BoxGeometry(sx, 0.0025, sz);
+      const m = new THREE.MeshStandardMaterial({ color: 0x333333 });
+      const c = new THREE.Mesh(g, m);
+      c.position.set(x, boardThick / 2 + 0.002, z);
+      group.add(c);
+    }
+
+    addChip(boardGroup1, -0.015,  0.010, 0.009, 0.005);
+    addChip(boardGroup1, -0.002,  0.008, 0.006, 0.004);
+    addChip(boardGroup1,  0.015,  0.005, 0.005, 0.004);
+
+    const gpioGeom = new THREE.BoxGeometry(boardLength * 0.7, 0.0015, 0.004);
+    const gpioMat  = new THREE.MeshStandardMaterial({ color: 0xccaa33 });
+    const gpio     = new THREE.Mesh(gpioGeom, gpioMat);
+    gpio.position.set(0.000, boardThick / 2 + 0.002, boardWidth/2 - 0.004);
+    boardGroup1.add(gpio);
+
+    const axesHelper1 = new THREE.AxesHelper(0.1);
+    boardGroup1.add(axesHelper1);
+
+    // -------- ВТОРИ БОРД (копие, леко различен) --------
+    boardGroup2 = boardGroup1.clone(true);
+    // да го сложим вдясно и леко по-назад
+    boardGroup2.position.set(0.12, 1.2, -0.35);
+
+    // да сменим леко цвета на платката, за да се различават
+    boardGroup2.traverse(obj => {
+      if (obj.isMesh && obj.material && obj.material.color) {
+        if (obj.material.color.getHex() === 0x006633) {
+          obj.material = obj.material.clone();
+          obj.material.color.set(0x004488); // по-синьо-зелено
+        }
+      }
+    });
+
+    scene.add(boardGroup2);
+
+    // Под (решетка)
+    const grid = new THREE.GridHelper(1.5, 15, 0x555555, 0x333333);
+    grid.position.y = 1.0;  // малко под бордовете – да виждаш база
     scene.add(grid);
 
     window.addEventListener('resize', onWindowResize);
@@ -119,6 +163,19 @@
   }
 
   function render(timestamp) {
+    const t = timestamp * 0.001;
+
+    if (boardGroup1) {
+      boardGroup1.rotation.x = t * 0.9;
+      boardGroup1.rotation.y = t * 1.3;
+      boardGroup1.rotation.z = t * 0.7;
+    }
+    if (boardGroup2) {
+      // вторият да се върти малко по-бавно и в друга посока
+      boardGroup2.rotation.x = -t * 0.7;
+      boardGroup2.rotation.y = t * 1.0;
+      boardGroup2.rotation.z = -t * 0.5;
+    }
 
     renderer.render(scene, camera);
   }
