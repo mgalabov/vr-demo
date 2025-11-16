@@ -1,153 +1,145 @@
-<!DOCTYPE html>
-<html lang="bg">
-<head>
-  <meta charset="UTF-8" />
-  <title>Raspberry Pi Zero – WebXR demo</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <style>
-    body { margin: 0; overflow: hidden; background: #000; }
-    canvas { display: block; }
-  </style>
-</head>
-<body>
-<script type="module">
-  import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
-  import { XRButton } from 'https://unpkg.com/three@0.160.0/examples/jsm/webxr/XRButton.js';
+    <!DOCTYPE html>
+    <html lang="bg">
+    <head>
+      <meta charset="UTF-8" />
+      <title>Raspberry Pi Zero – WebXR demo</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <style>
+        body { margin: 0; overflow: hidden; background: #000; }
+        canvas { display: block; }
+      </style>
+    </head>
+    <body>
+    <script type="module">
+      import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+      import { XRButton } from 'https://unpkg.com/three@0.160.0/examples/jsm/webxr/XRButton.js';
 
-  let scene, camera, renderer;
+      let scene, camera, renderer;
+      let boardGroup;
 
-  init();
-  animate();
+      init();
+      animate();
 
-  function init() {
-    // Сцена и камера
-    scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x101010);
+      function init() {
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x101010);
 
-    camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
-    camera.position.set(0, 1.6, 0); // височина на очите
+        camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+        camera.position.set(0, 1.6, 0);
 
-    renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.xr.enabled = true;
-    document.body.appendChild(renderer.domElement);
-    document.body.appendChild(XRButton.createButton(renderer));
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.xr.enabled = true;
+        document.body.appendChild(renderer.domElement);
+        document.body.appendChild(XRButton.createButton(renderer));
 
-    // Светлина
-    const light = new THREE.HemisphereLight(0xffffff, 0x222222, 1.2);
-    scene.add(light);
+        const light = new THREE.HemisphereLight(0xffffff, 0x222222, 1.2);
+        scene.add(light);
 
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    dirLight.position.set(1, 2, 1);
-    scene.add(dirLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(1, 2, 1);
+        scene.add(dirLight);
 
-    // ------- 3D модел на платката (опростен) -------
+        boardGroup = new THREE.Group();
+        scene.add(boardGroup);
 
-    // Размери в метри (приблизително 65mm x 30mm x 3mm)
-    const boardLength = 0.065;
-    const boardWidth  = 0.030;
-    const boardThick  = 0.003;
+        boardGroup.position.set(0, 1.2, -0.35);
 
-    // Платка (зелена)
-    const boardGeom = new THREE.BoxGeometry(boardLength, boardThick, boardWidth);
-    const boardMat  = new THREE.MeshStandardMaterial({ color: 0x006633 });
-    const board     = new THREE.Mesh(boardGeom, boardMat);
-    board.position.set(0, 1.4, -0.5); // пред потребителя
-    scene.add(board);
+        const boardLength = 0.065;
+        const boardWidth  = 0.030;
+        const boardThick  = 0.003;
 
-    // Жълти монтажни отвори
-    const holeRadius = 0.004;
-    const holeHeight = 0.0025;
-    const holeGeom = new THREE.CylinderGeometry(holeRadius, holeRadius, holeHeight, 24);
-    const holeMat  = new THREE.MeshStandardMaterial({ color: 0xdddd22 });
+        const boardGeom = new THREE.BoxGeometry(boardLength, boardThick, boardWidth);
+        const boardMat  = new THREE.MeshStandardMaterial({ color: 0x006633 });
+        const board     = new THREE.Mesh(boardGeom, boardMat);
+        boardGroup.add(board);
 
-    function addHole(x, z) {
-      const h = new THREE.Mesh(holeGeom, holeMat);
-      h.position.set(x, 1.4 + boardThick / 2 + holeHeight / 2, z);
-      h.rotation.x = Math.PI / 2;
-      scene.add(h);
-    }
+        const holeRadius = 0.004;
+        const holeHeight = 0.0025;
+        const holeGeom = new THREE.CylinderGeometry(holeRadius, holeRadius, holeHeight, 24);
+        const holeMat  = new THREE.MeshStandardMaterial({ color: 0xdddd22 });
 
-    const xOffset = boardLength / 2 - 0.006;
-    const zOffset = boardWidth / 2 - 0.006;
-    addHole(-xOffset, -zOffset);
-    addHole(-xOffset,  zOffset);
-    addHole( xOffset, -zOffset);
-    addHole( xOffset,  zOffset);
+        function addHole(x, z) {
+          const h = new THREE.Mesh(holeGeom, holeMat);
+          h.position.set(x, boardThick / 2 + holeHeight / 2, z);
+          h.rotation.x = Math.PI / 2;
+          boardGroup.add(h);
+        }
 
-    // Основен чип
-    const socGeom = new THREE.BoxGeometry(0.018, 0.003, 0.018);
-    const socMat  = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.3, roughness: 0.6 });
-    const soc     = new THREE.Mesh(socGeom, socMat);
-    soc.position.set(-0.010, 1.4 + boardThick / 2 + 0.002, 0.000);
-    scene.add(soc);
+        const xOffset = boardLength / 2 - 0.006;
+        const zOffset = boardWidth / 2 - 0.006;
+        addHole(-xOffset, -zOffset);
+        addHole(-xOffset,  zOffset);
+        addHole( xOffset, -zOffset);
+        addHole( xOffset,  zOffset);
 
-    // MicroSD слот
-    const sdGeom = new THREE.BoxGeometry(0.017, 0.003, 0.012);
-    const sdMat  = new THREE.MeshStandardMaterial({ color: 0x777777, metalness: 0.7, roughness: 0.3 });
-    const sd     = new THREE.Mesh(sdGeom, sdMat);
-    sd.position.set(-0.023, 1.4 + boardThick / 2 + 0.002, -0.010);
-    scene.add(sd);
+        const socGeom = new THREE.BoxGeometry(0.018, 0.003, 0.018);
+        const socMat  = new THREE.MeshStandardMaterial({ color: 0x222222 });
+        const soc     = new THREE.Mesh(socGeom, socMat);
+        soc.position.set(-0.010, boardThick / 2 + 0.002, 0.000);
+        boardGroup.add(soc);
 
-    // Двата micro-USB конектора
-    const usbGeom = new THREE.BoxGeometry(0.011, 0.004, 0.007);
-    const usbMat  = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, metalness: 0.8, roughness: 0.3 });
+        const sdGeom = new THREE.BoxGeometry(0.017, 0.003, 0.012);
+        const sdMat  = new THREE.MeshStandardMaterial({ color: 0x777777 });
+        const sd     = new THREE.Mesh(sdGeom, sdMat);
+        sd.position.set(-0.023, boardThick / 2 + 0.002, -0.010);
+        boardGroup.add(sd);
 
-    const usb1 = new THREE.Mesh(usbGeom, usbMat);
-    usb1.position.set(0.010, 1.4 + boardThick / 2 + 0.002, -boardWidth/2 + 0.004);
-    scene.add(usb1);
+        const usbGeom = new THREE.BoxGeometry(0.011, 0.004, 0.007);
+        const usbMat  = new THREE.MeshStandardMaterial({ color: 0xaaaaaa });
 
-    const usb2 = usb1.clone();
-    usb2.position.x = 0.023;
-    scene.add(usb2);
+        const usb1 = new THREE.Mesh(usbGeom, usbMat);
+        usb1.position.set(0.010, boardThick / 2 + 0.002, -boardWidth/2 + 0.004);
+        boardGroup.add(usb1);
 
-    // Mini-HDMI конектор
-    const hdmiGeom = new THREE.BoxGeometry(0.013, 0.004, 0.009);
-    const hdmiMat  = new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.8, roughness: 0.3 });
-    const hdmi     = new THREE.Mesh(hdmiGeom, hdmiMat);
-    hdmi.position.set(0.000, 1.4 + boardThick / 2 + 0.002, -boardWidth/2 + 0.004);
-    scene.add(hdmi);
+        const usb2 = usb1.clone();
+        usb2.position.x = 0.023;
+        boardGroup.add(usb2);
 
-    // Малки „чипчета“ и елементи
-    function addChip(x, z, sx, sz) {
-      const g = new THREE.BoxGeometry(sx, 0.0025, sz);
-      const m = new THREE.MeshStandardMaterial({ color: 0x333333 });
-      const c = new THREE.Mesh(g, m);
-      c.position.set(x, 1.4 + boardThick / 2 + 0.002, z);
-      scene.add(c);
-    }
+        const hdmiGeom = new THREE.BoxGeometry(0.013, 0.004, 0.009);
+        const hdmiMat  = new THREE.MeshStandardMaterial({ color: 0xcccccc });
+        const hdmi     = new THREE.Mesh(hdmiGeom, hdmiMat);
+        hdmi.position.set(0.000, boardThick / 2 + 0.002, -boardWidth/2 + 0.004);
+        boardGroup.add(hdmi);
 
-    addChip(-0.015,  0.010, 0.009, 0.005);
-    addChip(-0.002,  0.008, 0.006, 0.004);
-    addChip( 0.015,  0.005, 0.005, 0.004);
+        function addChip(x, z, sx, sz) {
+          const g = new THREE.BoxGeometry(sx, 0.0025, sz);
+          const m = new THREE.MeshStandardMaterial({ color: 0x333333 });
+          const c = new THREE.Mesh(g, m);
+          c.position.set(x, boardThick / 2 + 0.002, z);
+          boardGroup.add(c);
+        }
 
-    // GPIO редица (само като златна лента)
-    const gpioGeom = new THREE.BoxGeometry(boardLength * 0.7, 0.0015, 0.004);
-    const gpioMat  = new THREE.MeshStandardMaterial({ color: 0xccaa33, metalness: 0.6, roughness: 0.5 });
-    const gpio     = new THREE.Mesh(gpioGeom, gpioMat);
-    gpio.position.set(0.000, 1.4 + boardThick / 2 + 0.002, boardWidth/2 - 0.004);
-    scene.add(gpio);
+        addChip(-0.015,  0.010, 0.009, 0.005);
+        addChip(-0.002,  0.008, 0.006, 0.004);
+        addChip( 0.015,  0.005, 0.005, 0.004);
 
-    // Ресайз
-    window.addEventListener('resize', onWindowResize);
-  }
+        const gpioGeom = new THREE.BoxGeometry(boardLength * 0.7, 0.0015, 0.004);
+        const gpioMat  = new THREE.MeshStandardMaterial({ color: 0xccaa33 });
+        const gpio     = new THREE.Mesh(gpioGeom, gpioMat);
+        gpio.position.set(0.000, boardThick / 2 + 0.002, boardWidth/2 - 0.004);
+        boardGroup.add(gpio);
 
-  function onWindowResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-  }
+        window.addEventListener('resize', onWindowResize);
+      }
 
-  function animate() {
-    renderer.setAnimationLoop(render);
-  }
+      function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
 
-  function render() {
-    // може леко да въртим платката
-    // scene.rotation.y += 0.002; // ако искаш анимация
-    renderer.render(scene, camera);
-  }
-</script>
-</body>
-</html>
+      function animate() {
+        renderer.setAnimationLoop(render);
+      }
+
+      function render() {
+        if (boardGroup) {
+          boardGroup.rotation.y += 0.01;
+        }
+        renderer.render(scene, camera);
+      }
+    </script>
+    </body>
+    </html>
