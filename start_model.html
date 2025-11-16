@@ -2,14 +2,14 @@
 <html lang="bg">
 <head>
   <meta charset="UTF-8">
-  <title>WebXR Raspberry Pi Zero</title>
+  <title>WebXR – Два GLB модела</title>
   <style>
     body { margin: 0; overflow: hidden; background: #000; }
   </style>
 </head>
 <body>
 
-<!-- Three.js + добавките от CDN -->
+<!-- Three.js и помощните скриптове от CDN -->
 <script src="https://unpkg.com/three@0.165.0/build/three.min.js"></script>
 <script src="https://unpkg.com/three@0.165.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="https://unpkg.com/three@0.165.0/examples/js/webxr/VRButton.js"></script>
@@ -50,27 +50,42 @@
   grid.position.y = 0;
   scene.add(grid);
 
-  // Зареждане на GLB модела
+  // Зареждане на двата GLB модела
   const loader = new THREE.GLTFLoader();
+
+  // МОДЕЛ 1 – вляво
   loader.load(
-    'model.glb', // файлът ти трябва да се казва model.glb
+    'model1.glb',
     function (gltf) {
-      const model = gltf.scene;
-
-      // позиция и размер
-      model.position.set(0, 1, -0.8);   // пред теб
-      model.scale.set(0.001, 0.001, 0.001); // ако е в мм → към метри
-      model.rotation.x = -0.4;          // лек наклон
-
-      scene.add(model);
+      const model1 = gltf.scene;
+      model1.position.set(-0.3, 1.0, -0.7);  // леко вляво
+      model1.scale.set(0.001, 0.001, 0.001); // ако е в мм → към метри
+      model1.rotation.x = -0.4;
+      scene.add(model1);
     },
     undefined,
     function (error) {
-      console.error('Грешка при зареждане на model.glb:', error);
+      console.error('Грешка при зареждане на model1.glb:', error);
     }
   );
 
-  // Преоразмеряване
+  // МОДЕЛ 2 – вдясно
+  loader.load(
+    'model2.glb',
+    function (gltf) {
+      const model2 = gltf.scene;
+      model2.position.set(0.3, 1.0, -0.7);   // леко вдясно
+      model2.scale.set(0.001, 0.001, 0.001); // ако е в мм → към метри
+      model2.rotation.x = -0.4;
+      scene.add(model2);
+    },
+    undefined,
+    function (error) {
+      console.error('Грешка при зареждане на model2.glb:', error);
+    }
+  );
+
+  // Преоразмеряване на прозореца
   window.addEventListener('resize', function () {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
