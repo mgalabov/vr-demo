@@ -9,31 +9,32 @@
 </head>
 <body>
 
-<script type="module">
-  import * as THREE from 'https://unpkg.com/three@0.165.0/build/three.module.js';
-  import { GLTFLoader } from 'https://unpkg.com/three@0.165.0/examples/jsm/loaders/GLTFLoader.js';
-  import { VRButton } from 'https://unpkg.com/three@0.165.0/examples/jsm/webxr/VRButton.js';
+<!-- Three.js и помощни скриптове (НЕ-модулна версия) -->
+<script src="https://unpkg.com/three@0.165.0/build/three.min.js"></script>
+<script src="https://unpkg.com/three@0.165.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://unpkg.com/three@0.165.0/examples/js/webxr/VRButton.js"></script>
 
-  // --- SCENE ---
+<script>
+  // --- СЦЕНА ---
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x222222);
 
-  // --- CAMERA ---
+  // --- КАМЕРА ---
   const camera = new THREE.PerspectiveCamera(
     70, window.innerWidth / window.innerHeight, 0.01, 50
   );
   camera.position.set(0, 1.6, 1.5);
 
-  // --- RENDERER ---
+  // --- РЕНДЕРЕР ---
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.xr.enabled = true;
   document.body.appendChild(renderer.domElement);
 
-  // --- VR BUTTON ---
+  // --- VR БУТОН ---
   document.body.appendChild(VRButton.createButton(renderer));
 
-  // --- LIGHTS ---
+  // --- СВЕТЛИНИ ---
   const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0);
   scene.add(hemi);
 
@@ -41,45 +42,44 @@
   dir.position.set(3, 5, 2);
   scene.add(dir);
 
-  // --- GROUND GRID ---
+  // --- ПОД (РЕШЕТКА) ---
   const grid = new THREE.GridHelper(4, 40, 0x444444, 0x222222);
   grid.position.y = 0;
   scene.add(grid);
 
-  // --- LOAD 3D MODEL ---
-  const loader = new GLTFLoader();
+  // --- ЗАРЕЖДАНЕ НА GLB МОДЕЛА ---
+  const loader = new THREE.GLTFLoader();
   loader.load(
-    'model.glb',
-    (gltf) => {
+    'model.glb',       // ТУК ИМЕТО НА ФАЙЛА ТИ
+    function (gltf) {
       const model = gltf.scene;
 
       // позиция и размер
       model.position.set(0, 1, -0.8);
-      model.scale.set(0.001, 0.001, 0.001); // ако моделът е в мм → скалира към метри
+      model.scale.set(0.001, 0.001, 0.001); // ако е в мм → свиваме до метри
 
-      // завърти леко за по-хубав изглед
+      // лек наклон, за да го гледаш отгоре
       model.rotation.x = -0.5;
 
       scene.add(model);
     },
     undefined,
-    (err) => {
-      console.error('Грешка при зареждане на model.glb:', err);
+    function (error) {
+      console.error('Грешка при зареждане на model.glb:', error);
     }
   );
 
-  // --- RESIZE HANDLER ---
-  window.addEventListener('resize', () => {
+  // --- REZIZE ---
+  window.addEventListener('resize', function () {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
 
-  // --- VR LOOP ---
-  renderer.setAnimationLoop(() => {
+  // --- РЕНДЕР ЦИКЪЛ ---
+  renderer.setAnimationLoop(function () {
     renderer.render(scene, camera);
   });
-
 </script>
 
 </body>
