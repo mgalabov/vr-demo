@@ -48,21 +48,23 @@
         color="#333"
       ></a-plane>
 
-      <!-- Модел 1 (вляво) -->
-      <a-entity
-        gltf-model="url(model1.glb)"
-        position="-1.2 0 -2"
-        rotation="0 0 0"
-        scale="1 1 1"
-      ></a-entity>
+      <!-- Модел 1 (вляво, на 1.5 m височина, въртящ се) -->
+<a-entity
+  gltf-model="url(model1.glb)"
+  position="-1.2 1.5 -2"
+  rotation="0 0 0"
+  scale="1 1 1"
+  animation="property: rotation; to: 360 360 360; loop: true; dur: 15000; easing: linear"
+></a-entity>
 
-      <!-- Модел 2 (вдясно) -->
-      <a-entity
-        gltf-model="url(model2.glb)"
-        position="1.2 0 -2"
-        rotation="0 0 0"
-        scale="1 1 1"
-      ></a-entity>
+<!-- Модел 2 (вдясно, на 1.5 m височина, въртящ се) -->
+<a-entity
+  gltf-model="url(model2.glb)"
+  position="1.2 1.5 -2"
+  rotation="0 0 0"
+  scale="1 1 1"
+  animation="property: rotation; to: 360 360 360; loop: true; dur: 15000; easing: linear"
+></a-entity>
 
       <!-- Камера (потребителят) -->
       <a-entity
