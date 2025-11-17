@@ -2,118 +2,178 @@
 <html lang="bg">
 <head>
   <meta charset="UTF-8" />
-  <title>WebXR — два GLB модела</title>
+  <title>WebXR — два GLB модела (без modules)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     body { margin: 0; overflow: hidden; font-family: sans-serif; }
+    canvas { display: block; }
     #info {
       position: absolute;
       top: 10px; left: 10px;
       padding: 8px 12px;
-      background: rgba(0,0,0,0.6);
+      background: rgba(0,0,0,0.7);
       color: #fff;
       z-index: 10;
       font-size: 14px;
+    }
+    #vrButton {
+      position: absolute;
+      bottom: 20px; left: 50%;
+      transform: translateX(-50%);
+      padding: 10px 20px;
+      background: #1e88e5;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 16px;
+      cursor: pointer;
+      z-index: 10;
+      display: none;
+    }
+    #vrButton:disabled {
+      background: #555;
+      cursor: default;
     }
   </style>
 </head>
 <body>
 
 <div id="info">Зареждане на сцената...</div>
+<button id="vrButton">Влез в VR</button>
 
-<script type="module">
-import * as THREE from 'https://unpkg.com/three@0.165.0/build/three.module.js';
-import { GLTFLoader } from 'https://unpkg.com/three@0.165.0/examples/jsm/loaders/GLTFLoader.js';
-import { VRButton } from 'https://unpkg.com/three@0.165.0/examples/jsm/webxr/VRButton.js';
+<!-- THREE.js и GLTFLoader от CDN (класически, без модули) -->
+<script src="https://unpkg.com/three@0.157.0/build/three.min.js"></script>
+<script src="https://unpkg.com/three@0.157.0/examples/js/loaders/GLTFLoader.js"></script>
 
-const info = document.getElementById('info');
-info.textContent = 'Сцената е стартирана. Проверка за WebXR...';
+<script>
+  const info = document.getElementById('info');
+  const vrButton = document.getElementById('vrButton');
 
-// SCENE
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x202020);
+  info.textContent = 'Сцената е стартирана. Инициализация...';
 
-// CAMERA
-const camera = new THREE.PerspectiveCamera(
-  70,
-  window.innerWidth / window.innerHeight,
-  0.1,
-  100
-);
-camera.position.set(0, 1.6, 3);
+  // СЦЕНА
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x202020);
 
-// RENDERER
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.xr.enabled = true;
-document.body.appendChild(renderer.domElement);
+  // КАМЕРА
+  const camera = new THREE.PerspectiveCamera(
+    70,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    100
+  );
+  camera.position.set(0, 1.6, 3);
 
-// LIGHT
-const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
-scene.add(hemi);
-
-// FLOOR
-const floorGeo = new THREE.PlaneGeometry(10, 10);
-const floorMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
-const floor = new THREE.Mesh(floorGeo, floorMat);
-floor.rotation.x = -Math.PI / 2;
-floor.position.y = 0;
-scene.add(floor);
-
-// GLB LOADER
-const loader = new GLTFLoader();
-
-// LOAD MODEL 1
-loader.load(
-  'model1.glb',
-  (gltf) => {
-    const model1 = gltf.scene;
-    model1.position.set(-1.2, 0, -2);
-    model1.scale.set(1, 1, 1);
-    scene.add(model1);
-    console.log('model1.glb зареден');
-  },
-  undefined,
-  (err) => {
-    console.error('Грешка при model1.glb:', err);
-  }
-);
-
-// LOAD MODEL 2
-loader.load(
-  'model2.glb',
-  (gltf) => {
-    const model2 = gltf.scene;
-    model2.position.set(1.2, 0, -2);
-    model2.scale.set(1, 1, 1);
-    scene.add(model2);
-    console.log('model2.glb зареден');
-  },
-  undefined,
-  (err) => {
-    console.error('Грешка при model2.glb:', err);
-  }
-);
-
-// WEBXR CHECK
-if ('xr' in navigator) {
-  info.textContent = 'WebXR е наличен. Трябва да виждаш VR бутон в поддържан браузър.';
-  document.body.appendChild(VRButton.createButton(renderer));
-} else {
-  info.textContent = 'WebXR НЕ се поддържа в този браузър. Виждаш само 3D изглед.';
-}
-
-// ANIMATION
-renderer.setAnimationLoop(() => {
-  renderer.render(scene, camera);
-});
-
-// RESIZE
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
+  // РЕНДЕРЪР
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
-});
+  renderer.xr.enabled = true;
+  document.body.appendChild(renderer.domElement);
+
+  // СВЕТЛИНА
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
+  hemi.position.set(0, 1, 0);
+  scene.add(hemi);
+
+  // ПОД
+  const floorGeo = new THREE.PlaneGeometry(10, 10);
+  const floorMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+  const floor = new THREE.Mesh(floorGeo, floorMat);
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = 0;
+  floor.receiveShadow = true;
+  scene.add(floor);
+
+  // GLTF LOADER
+  const loader = new THREE.GLTFLoader();
+
+  // MODEL 1
+  loader.load(
+    'model1.glb',
+    function (gltf) {
+      const model1 = gltf.scene;
+      model1.position.set(-1.2, 0, -2); // ляво
+      model1.scale.set(1, 1, 1);
+      scene.add(model1);
+      console.log('model1.glb зареден');
+    },
+    undefined,
+    function (error) {
+      console.error('Грешка при model1.glb:', error);
+    }
+  );
+
+  // MODEL 2
+  loader.load(
+    'model2.glb',
+    function (gltf) {
+      const model2 = gltf.scene;
+      model2.position.set(1.2, 0, -2); // дясно
+      model2.scale.set(1, 1, 1);
+      scene.add(model2);
+      console.log('model2.glb зареден');
+    },
+    undefined,
+    function (error) {
+      console.error('Грешка при model2.glb:', error);
+    }
+  );
+
+  // ANIMATION LOOP
+  function render() {
+    renderer.render(scene, camera);
+  }
+  renderer.setAnimationLoop(render);
+
+  // RESIZE
+  window.addEventListener('resize', function () {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // WEBXR / VR БУТОН (без външен VRButton.js)
+  let currentSession = null;
+
+  async function onVRButtonClick() {
+    if (!navigator.xr) return;
+
+    if (currentSession === null) {
+      try {
+        const session = await navigator.xr.requestSession('immersive-vr', {
+          optionalFeatures: ['local-floor', 'bounded-floor']
+        });
+        await renderer.xr.setSession(session);
+        currentSession = session;
+        vrButton.textContent = 'Излез от VR';
+
+        session.addEventListener('end', () => {
+          currentSession = null;
+          vrButton.textContent = 'Влез в VR';
+        });
+      } catch (e) {
+        console.error('Грешка при стартиране на VR сесия:', e);
+      }
+    } else {
+      currentSession.end();
+    }
+  }
+
+  vrButton.addEventListener('click', onVRButtonClick);
+
+  // Проверка за WebXR поддръжка
+  if ('xr' in navigator) {
+    navigator.xr.isSessionSupported('immersive-vr').then((supported) => {
+      if (supported) {
+        info.textContent = 'WebXR е наличен. Натисни "Влез в VR", за да влезеш.';
+        vrButton.style.display = 'block';
+      } else {
+        info.textContent = 'Този браузър не поддържа immersive VR сесии.';
+      }
+    });
+  } else {
+    info.textContent = 'navigator.xr липсва — WebXR не се поддържа в този браузър.';
+  }
 </script>
 </body>
 </html>
