@@ -48,19 +48,19 @@
         color="#333"
       ></a-plane>
 
-     
-      <a-entity
-        gltf-model="url(model2.glb)"
-        position="-1.2 3 -4"
-        rotation="0 0 0"
-        scale="0.5 0.5 0.5"
-        animation="property: rotation; to: 360 360 360; loop: true; dur: 15000; easing: linear"
-      ></a-entity>
-
-      
-     <a-entity
+  <!-- Модел 1 – вдясно и малко по-напред -->
+<a-entity
   gltf-model="url(model1.glb)"
-  position="-1.2 3 -2.8"
+  position="2.5 3 -2"
+  rotation="0 0 0"
+  scale="1 1 1"
+  animation="property: rotation; to: 360 360 360; loop: true; dur: 15000; easing: linear"
+></a-entity>
+
+<!-- Модел 2 – вляво и малко по-назад -->
+<a-entity
+  gltf-model="url(model2.glb)"
+  position="-2.5 3 -3"
   rotation="0 0 0"
   scale="1 1 1"
   animation="property: rotation; to: 360 360 360; loop: true; dur: 15000; easing: linear"
